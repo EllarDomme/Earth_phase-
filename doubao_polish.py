@@ -127,6 +127,13 @@ def _run_paint(image_path, out_dir, timeout_ms=600000, new_chat=True,
             print("   " + ln)
         if ln.startswith("ATTACH_SIZE="):
             attach = ln.split("=", 1)[1].strip()
+        # ★ 2026-11-08 修：这两行原来被缩进到了下面的 else 里，导致标题永远读不到，
+        #   于是"每轮结束删对话"从来没生效（侧栏堆了 147 条）。
+        if ln.startswith("CONV_TITLE="):
+            _LAST_CONV["title"] = ln.split("=", 1)[1].strip()
+            print("   [对话] " + _LAST_CONV["title"])
+        if ln.startswith("CONV_URL="):
+            _LAST_CONV["url"] = ln.split("=", 1)[1].strip()
 
     # ★ 核对"发出去的附件尺寸"是否等于本地这张图
     try:
@@ -143,11 +150,6 @@ def _run_paint(image_path, out_dir, timeout_ms=600000, new_chat=True,
     else:
         # 读不到就只告警，不阻断（页面结构变化时不能把整条流水线卡死）
         print("   [附件核对] 页面尺寸读不到，跳过核对（本地 %s）" % want)
-        if ln.startswith("CONV_TITLE="):
-            _LAST_CONV["title"] = ln.split("=", 1)[1].strip()
-            print("   [对话] " + _LAST_CONV["title"])
-        if ln.startswith("CONV_URL="):
-            _LAST_CONV["url"] = ln.split("=", 1)[1].strip()
     start = out.find("RESULT_JSON=")
     if start < 0:
         raise RuntimeError("doubao_run 无结果：" + (out or p.stderr.decode("utf-8", "ignore"))[-400:])

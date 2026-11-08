@@ -69,8 +69,21 @@ def ensure(port=PORT, wait=90, verbose=True, allow_launch=False):
 
     if not allow_launch:
         if verbose:
-            print("[豆包] 未运行（或未带调试端口）。需要向用户申请一次提权后启动：")
-            print("       Start-Process \"%s\" --ArgumentList \"--remote-debugging-port=9225\"")
+            print("")
+            print("=" * 68)
+            print("[需要你操作] 豆包没开着（或没带调试端口），无法自动出图。")
+            print("")
+            print("  请复制下面这条命令到 PowerShell 执行，然后重新跑本程序：")
+            print("")
+            print('  Start-Process "%s" -ArgumentList "--remote-debugging-port=%d"'
+                  % (APP_EXE, port))
+            print("")
+            print("  注意：如果豆包已经在运行，这样启动【不会】带端口。")
+            print("        先在任务管理器里结束所有 Doubao.exe，再执行上面的命令。")
+            print("")
+            print("  不确定路径？执行： python config.py")
+            print("=" * 68)
+            print("")
         return False
 
     if verbose:
