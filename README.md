@@ -110,6 +110,21 @@ python config.py
 
 ---
 
+## 用 AI 助手驱动（可选）
+
+仓库里带了 `AGENTS.md`——它是写给 AI 助手看的操作规程。
+
+如果你用支持 `AGENTS.md` 的助手（例如 DeepSeek Harness、Claude Code 等）打开本项目，
+可以直接说：
+
+> 帮我出 2009 年 6 月 21 日那张图
+
+助手会按 `AGENTS.md` 自动：检查豆包端口 → `check` 确认中国在亮部 → 跑主流程 → `verify` → 汇报。
+
+**不用 AI 也完全能跑**，就是上面的命令行方式；AI 只是省掉你记流程。
+
+---
+
 ## 用法
 
 ```bash

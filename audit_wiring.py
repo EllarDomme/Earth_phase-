@@ -31,6 +31,7 @@ F = {
     "config": os.path.join(HERE, "config.py"),
     "readme": os.path.join(HERE, "README.md"),
     "req": os.path.join(HERE, "requirements.txt"),
+    "agents_repo": os.path.join(HERE, "AGENTS.md"),
 }
 
 # (文件, 说明, 正则)
@@ -217,6 +218,8 @@ CHECKS = [
     ("readme", "README 写明需要 Node", r"Node\.js（豆包驱动需要）"),
     ("readme", "README 声明豆包必需", r"必须配合「豆包」使用|本项目必须配合"),
     ("req", "requirements.txt", r"numpy>=1\.24"),
+    ("agents_repo", "仓库内 AGENTS.md 存在", r"给 AI 助手看的"),
+    ("readme", "README 说明 AI 助手用法", r"用 AI 助手驱动"),
     ("md", "之五十五 开源前置", r"开源前的改造"),
     ("md", "之五十五 尺寸判据", r"尺寸 2048 vs 1536"),
     ("md", "之五十五 跨运行污染", r"中转站跨运行的污染"),
