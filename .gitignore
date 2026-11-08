@@ -1,0 +1,29 @@
+# 交付物与中间产物（体积大，不入库）
+成品/
+v2/
+中转站/
+文档/
+
+# 本机配置（含绝对路径，因人而异）
+config.json
+python.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 日志与临时
+*.log
+_log*.txt
+*.tmp
+*.tmp.png
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
