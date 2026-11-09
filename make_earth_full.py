@@ -719,14 +719,17 @@ def main():
     #     ② 拼图成功但"提升版那张"没拼出来（stage_boost 返回 b=None）
     #   不补的话 verify.py 会因为文件缺失直接 FAIL，而缺的只是一步本来
     #   就没多少增益的处理；补同名文件既保住交付完整性，也不隐瞒。
-    if getattr(a, "boost", False) and qc.get("moon_path"):
+    if getattr(a, "moon", False) and qc.get("moon_path"):
         try:
             import shutil as _shc
             _bn = qc["moon_path"].replace("_月面_", "_月面_提升_")
             if _bn != qc["moon_path"] and not os.path.exists(_bn):
                 _shc.copy2(qc["moon_path"], _bn)
                 qc["moon_boost_path"] = _bn
-                print("[提升] 失败补偿：提升版 = 月面版（内容相同，原因见上面的日志）")
+                if getattr(a, "boost", False):
+                    print("[提升] 失败补偿：提升版 = 月面版（内容相同，原因见上面的日志）")
+                else:
+                    print("[提升] 未开启提升（noboost）：提升版 = 月面版（内容相同）")
         except Exception as _e2:
             print("[提升] 补偿失败：", _e2)
 

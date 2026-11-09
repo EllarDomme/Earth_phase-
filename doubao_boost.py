@@ -660,10 +660,21 @@ def main():
     a = ap.parse_args()
 
     if a.disc_geom:
-        _p = [float(v) for v in a.disc_geom.split(",")]
-        if len(_p) == 3:
-            set_disc_geom(*_p)
-            print("[提升] 圆盘几何覆盖为 %.3f,%.3f,%.3f（居中圆盘用 0.5,0.5,0.5）" % tuple(_p))
+        # ★ 格式错必须报错退出：以前传 2 个或 4 个数会被静默忽略，
+        #   退回海报几何 → 圆盘图上的 restore_scene/match_disc 全部打偏。
+        _parts = [v.strip() for v in a.disc_geom.split(",") if v.strip() != ""]
+        if len(_parts) != 3:
+            sys.exit("--disc-geom 需要三个归一化数（fx,fy,fr），例如 0.5,0.5,0.5；"
+                     "收到 %r" % a.disc_geom)
+        try:
+            _vals = [float(v) for v in _parts]
+        except ValueError:
+            sys.exit("--disc-geom 含非数字：%r" % a.disc_geom)
+        if not all(0.0 < v <= 1.5 for v in _vals):
+            sys.exit("--disc-geom 数值应在 (0, 1.5] 内：%r" % (a.disc_geom,))
+        set_disc_geom(*_vals)
+        print("[提升] 圆盘几何覆盖为 %.3f,%.3f,%.3f（居中圆盘用 0.5,0.5,0.5）"
+              % tuple(_vals))
 
     src = a.image
     out = a.out or os.path.splitext(src)[0] + "_boost.png"

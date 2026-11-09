@@ -60,10 +60,21 @@ def disc_metrics(path):
 
 
 def main(date):
+    # ★ 宽度不要写死 1920：run.cmd 默认 1920，但 --moon-width 可改，
+    #   写死会让"出了 2560 的图却报缺文件"（2026-11-09 查到的隐患）。
+    import glob as _glob
+
+    def _pick(date, tag):
+        exact = os.path.join(OUT, "%s_%s_1920x1280.png" % (date, tag))
+        if os.path.exists(exact):
+            return exact
+        cands = sorted(_glob.glob(os.path.join(OUT, "%s_%s_*x1280.png" % (date, tag))))
+        return cands[0] if cands else exact
+
     files = {
         "地球相": os.path.join(OUT, "%s_地球相_2048.png" % date),
-        "月面版": os.path.join(OUT, "%s_月面_1920x1280.png" % date),
-        "提升版": os.path.join(OUT, "%s_月面_提升_1920x1280.png" % date),
+        "月面版": _pick(date, "月面"),
+        "提升版": _pick(date, "月面_提升"),
     }
     ok = True
     print("=" * 60)
