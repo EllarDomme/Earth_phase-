@@ -84,14 +84,21 @@ exit /b 1
 
 :nocdp
 echo.
-echo [WARN] Doubao debug port 9225 is not reachable.
-echo        Run these first (needs elevation):
-echo          taskkill /F /IM Doubao.exe
-echo         python config.py     ^(shows Doubao path + start command^)
+echo [WARN] Doubao is not running with the debug port (9225).
+echo        This pipeline needs it for the two polish rounds.
 echo.
-choice /c YN /m "Continue anyway"
-if errorlevel 2 exit /b 1
-goto :runfull
+echo   Step 1  close Doubao completely (a fresh start is required):
+echo             taskkill /F /IM Doubao.exe
+echo.
+echo   Step 2  print the exact path + start command:
+echo             python config.py
+echo.
+echo   Step 3  run that Start-Process line, then re-run this command.
+echo.
+echo   (No admin rights needed. An already-running Doubao will NOT
+echo    open the port, so step 1 is not optional.)
+echo.
+exit /b 1
 
 :failed
 echo.
