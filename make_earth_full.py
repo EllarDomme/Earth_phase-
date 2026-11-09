@@ -542,6 +542,13 @@ def main():
             return 2
         _dst_reuse = os.path.splitext(out_png)[0] + "_polished.png"
         _shr.copy2(_src_reuse, _dst_reuse)
+        # ★ copy2 会把源文件的只读属性一起带过来（用户的附件常是只读的），
+        #   下一次运行就会 Permission denied。复制完立刻去掉只读。
+        try:
+            os.chmod(_dst_reuse, 0o666)
+        except OSError:
+            import stat as _st
+            os.chmod(_dst_reuse, _st.S_IWRITE)
         qc["polished"] = True
         qc["polished_path"] = _dst_reuse
         qc["reused"] = _src_reuse
@@ -719,12 +726,15 @@ def main():
     #     ② 拼图成功但"提升版那张"没拼出来（stage_boost 返回 b=None）
     #   不补的话 verify.py 会因为文件缺失直接 FAIL，而缺的只是一步本来
     #   就没多少增益的处理；补同名文件既保住交付完整性，也不隐瞒。
-    if getattr(a, "moon", False) and qc.get("moon_path"):
+    #   ★ 判定要用"本次运行是否产出过提升版"，不能用"文件是否存在"：
+    #     上一次跑留下的旧提升版会让这里误判为"已有"，导致新旧两张不配套，
+    #     而 verify 照样 PASS（2026-11-09 实测踩到）。
+    if getattr(a, "moon", False) and qc.get("moon_path") and not qc.get("moon_boost_path"):
         try:
             import shutil as _shc
             _bn = qc["moon_path"].replace("_月面_", "_月面_提升_")
-            if _bn != qc["moon_path"] and not os.path.exists(_bn):
-                _shc.copy2(qc["moon_path"], _bn)
+            if _bn != qc["moon_path"]:
+                _shc.copy2(qc["moon_path"], _bn)      # 覆盖旧文件，保证配套
                 qc["moon_boost_path"] = _bn
                 if getattr(a, "boost", False):
                     print("[提升] 失败补偿：提升版 = 月面版（内容相同，原因见上面的日志）")
@@ -752,6 +762,13 @@ def main():
             else:
                 _dst = os.path.join(_ad, "%s_地球相_%d.png" % (D, a.size))
             _shp.copy2(_src, _dst)
+            # copy2 会保留只读属性：源若是只读（--reuse 的附件），
+            # 归档出的坏份下次就写不进去。复制完统一去只读。
+            try:
+                os.chmod(_dst, 0o666)
+            except OSError:
+                import stat as _st2
+                os.chmod(_dst, _st2.S_IWRITE)
             _meta = dict(date=D,
                          view="%.1fN %.1fE" % (qc["view_lat"], qc["view_lon"]),
                          phase="%.0f%%" % qc.get("earth_phase_pct", -1),

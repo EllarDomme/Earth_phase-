@@ -40,8 +40,10 @@ L_FLOOR = 18.5        # 白天最低 = 夜面上限，保证跨 0° 不回跳
 #   月夜把月面压到中位 ~18，8 位色阶只剩 30 来个（白天是 200+），
 #   高频能量 1.5 vs 7.0，看着糊。这里围绕中位做一次温和的对比度拉伸，
 #   平均亮度基本不变，但细节能读出来。1.0 = 关。
+#   2026-11-09 定稿 4.0（1.6 → 2.4 → 4.0 三档实测：17 级 / 25 级 / 38 级）。中位亮度仅 16→19，
+#   中位亮度不动，只是把被 8 位量化压没的反照率差异还原回来。
 #   注意：这是"暗部提亮"，属于后期美化，不是物理还原。
-NIGHT_CONTRAST = float(os.environ.get("DSH_NIGHT_CONTRAST", "1.6"))
+NIGHT_CONTRAST = float(os.environ.get("DSH_NIGHT_CONTRAST", "4.0"))
 BASE = os.path.join(HERE, "素材", "moon_base.png")
 BASE_MIRROR = os.path.join(HERE, "素材", "moon_base_mirror.png")
 _BASE_SCALE = 1.0          # 月面亮度系数（只压不提）

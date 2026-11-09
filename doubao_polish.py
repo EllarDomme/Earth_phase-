@@ -392,6 +392,8 @@ def main():
                     help="球面视点 lat,lon（如 23.41,118.99）；否则自动从 qc_*.json 读")
     ap.add_argument("--passes", type=int, default=2,
                     help="固定 2 轮，不许改（手册规定）")
+    ap.add_argument("--round1", default=None,
+                    help="已有的第一轮成品：直接从第二轮开始（不再调第一轮）")
     a = ap.parse_args()
 
     src_path = os.path.abspath(a.image)
@@ -439,6 +441,13 @@ def main():
     passes = 2                      # ★ 手册规定：严格两轮，不多不少
     report = {"source": src_path, "prompt": PROMPT, "passes": []}
     cur = src
+    if a.round1:
+        if not os.path.exists(a.round1):
+            print("[中止] --round1 指定的文件不存在：%s" % a.round1)
+            return 2
+        cur = Image.open(a.round1).convert("RGB")
+        print("[跳过] 第一轮：直接使用已有成品 %s %s"
+              % (os.path.basename(a.round1), cur.size))
     # ── 自检：两轮各开新对话（2026-11-06 改）──
     import inspect as _ins
     _src = _ins.getsource(_run_paint)
@@ -466,11 +475,26 @@ def main():
     except Exception:
         STATION = out_dir
     round1_final = os.path.join(STATION, "%s_%s_最终成品.png" % (_stamp, _date_tag))
+    if a.round1:
+        # 外部给的第一轮成品就是"中转站里那张"，直接按同一命名放进去，
+        # 第二轮上传时仍然走"取中转站文件"的原逻辑；重名则加 (2)(3)。
+        _n = 1
+        while os.path.exists(round1_final):
+            _n += 1
+            round1_final = os.path.join(
+                STATION, "%s_%s_最终成品(%d).png" % (_stamp, _date_tag, _n))
+        _shutil_first = __import__("shutil")
+        _shutil_first.copy2(a.round1, round1_final)
+        try:
+            os.chmod(round1_final, 0o666)
+        except OSError:
+            pass
+        print("[跳过] 第一轮成品已放入中转站：%s" % os.path.basename(round1_final))
     print("[中转站] 目录：%s" % STATION)
     print("[命名] 第一轮成品名：%s" % os.path.basename(round1_final))
 
     try:
-        for i in range(1, passes + 1):
+        for i in range((2 if a.round1 else 1), passes + 1):
             print("[豆包第 %d 遍] 发送 %s" % (i, cur.size))
             stage = os.path.join(tmp, "in_%d.png" % i)
             if i == 2 and os.path.exists(round1_final):
