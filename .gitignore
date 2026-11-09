@@ -27,3 +27,7 @@ _log*.txt
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# 试验性底图（未启用，仅本地保留）
+素材/*_v2.png
+素材/*_v2_mirror.png
