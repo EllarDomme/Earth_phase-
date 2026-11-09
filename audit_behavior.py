@@ -149,6 +149,43 @@ def main():
         except Exception as e:
             print("- 不变量   跳过（%s）" % str(e)[:50])
 
+    # ⑥b 显式 --base 不得绕过亮度分档 / 月夜质感
+    #   2026-11-09 第二次同类事故：--base 分支只判镜像，跳过亮度系数与质感，
+    #   实测月夜日期地形 86（应为 18）。
+    try:
+        import numpy as np
+        from PIL import Image
+        sys.path.insert(0, HERE)
+        _src = os.path.join(HERE, "v2", "_bak_uni_2006-04-05_地球相_2048.png")
+        _base = os.path.join(HERE, "素材", "moon_base_无影.png")
+        if os.path.exists(_src) and os.path.exists(_base):
+            _common = ["--date", "2006-04-05", "--utc", "7.75", "--width", "1920",
+                       "--earth-pct", "0.36", "--moon-gain", "0.65",
+                       "--sky-target", "1,1,1", "--earth-gamma", "1.0",
+                       "--earth-sat", "1.0"]
+            _pa = os.path.join(TMP, "_ab_auto.png").replace(".png", ".png")
+            _pb = os.path.join(TMP, "_ab_base.png").replace(".png", ".png")
+            import subprocess as _sp
+            _sp.run([PY, os.path.join(HERE, "compose_moon.py"), _src, _pa] + _common,
+                    capture_output=True, timeout=600)
+            _sp.run([PY, os.path.join(HERE, "compose_moon.py"), _src, _pb,
+                     "--base", _base] + _common, capture_output=True, timeout=600)
+
+            def _med(p):
+                A = np.asarray(Image.open(p).convert("L")).astype(np.float32)
+                t = A[900:]
+                t = t[t > 1]
+                return float(np.median(t))
+
+            if os.path.exists(_pa) and os.path.exists(_pb):
+                ma, mb = _med(_pa), _med(_pb)
+                ok = abs(ma - mb) <= 2
+                print("%s 参数绕过   显式 --base 与自动分档一致（%.0f vs %.0f，应差 ≤2）"
+                      % ("✓" if ok else "✗", ma, mb))
+                bad += 0 if ok else 1
+    except Exception as e:
+        print("- 参数绕过   跳过（%s）" % str(e)[:50])
+
     # ⑦ 每对成品：提升版必须和普通版的明暗一致（漏打光会当场暴露）
     #   2026-11-09 实测事故：boost-first 漏打光 → 提升版地球变成满盘平光，
     #   暗像素从 87% 掉到 6%，但因为"图还能打开"，静态检查完全看不出。

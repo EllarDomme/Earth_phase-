@@ -225,8 +225,10 @@ CHECKS = [
     ("moon", "四张底图分档", r"BASE_TIERS"),
     ("moon", "亮度系数只压不提", r"_BASE_SCALE"),
     # ── 规则不绕过（2026-11-09 用户发现的第三类 bug：参数一给就绕过后续逻辑）
-    ("moon", "--base 也要判镜像", r"显式指定底图时，仍然要按光照方向"),
-    ("moon!", "--base 的旧捷径已删", r"if a\.base:\n    BASE = a\.base\n"),
+    ("moon", "分档只有一条路径", r"底图 / 亮度 / 质感：一条路径"),
+    ("moon", "--base 也走亮度分档", r"_tname = next\(\(n for n in BASE_TIERS"),
+    ("moon", "月面物理量只算一次", r"def _phys\(date, utc\)"),
+    ("moon!", "旧的重复星历代码已删", r"def _unit0\("),
     ("moon", "星点 mask 跟随 --cx", r"a\.cx \* Ww"),
     ("moon!", "星点 mask 不再写死圆心", r"xx - 0\.50 \* Ww"),
     ("moon", "--cx 真的传进几何", r"a\.cx\b"),
