@@ -224,7 +224,12 @@ def main():
                     help="再合成《地出》式版式：月面底图 + 我们的地球")
     ap.add_argument("--moon-width", type=int, default=1920)
     ap.add_argument("--boost", action="store_true", default=False,
-                    help="最后一道：把月面图交豆包提清晰度，再压回地球暗部亮度")
+                    help="把月面图交豆包提清晰度（旧顺序：拼图后处理整张海报）")
+    ap.add_argument("--boost-last", action="store_true", default=False,
+                    help="★ 回退到旧顺序：拼图后把整张海报交豆包提清晰度"
+                         "（豆包会看到并重绘月面，不建议）")
+    ap.add_argument("--boost-first", action="store_true", default=False,
+                    help=argparse.SUPPRESS)   # 已变默认，保留只为兼容旧命令
     ap.add_argument("--no-clean", dest="clean", action="store_false",
                     help="保留 v2 中间产物（默认跑完自动清理）")
     ap.add_argument("--reuse", default=None,
@@ -246,13 +251,17 @@ def main():
             _r, _rows, _msg = _cr.best(D)
             if _r:
                 a.utc = _r["utc"]
-                print("[中国] %s｜UTC %.2f｜中国 可见 %.2f 受光 %.2f｜采样点 可见 %d/10 受光 %d/10"
-                      % (_msg, a.utc, _r["vis"], _r["lit"], _r["v_ok"], _r["l_ok"]))
+                # ★ 相位必须和 UTC 一起报：同一天内相位最多差 9 个点，
+                #   "日期"本身不足以确定相位（2026-11-09 讨论）。
+                print("[中国] %s｜UTC %.2f｜相位 %.0f%%｜中国 可见 %.2f 受光 %.2f｜采样点 可见 %d/10 受光 %d/10"
+                      % (_msg, a.utc, _r.get("phase", float("nan")),
+                         _r["vis"], _r["lit"], _r["v_ok"], _r["l_ok"]))
                 if _r["vis"] < 0.35 or _r["lit"] < 0.35:
                     print("[中国] 注意：中国靠近球缘/晨昏线，可辨识度下降")
             else:
                 a.utc = a.utc_fixed
-                print("[中国] %s，回落到 UTC %.2f" % (_msg, a.utc))
+                print("[中国] %s，回落到 UTC %.2f（相位 %.0f%%）"
+                      % (_msg, a.utc, qc.get("earth_phase_pct", float("nan"))))
         except Exception as _e:
             a.utc = a.utc_fixed
             print("[中国] 求解失败（%s），回落到 UTC %.2f" % (_e, a.utc))
@@ -572,8 +581,48 @@ def main():
     # ── 豆包二轮之后：不再做任何加工（增强/海报都已移除，见手册之二十三）
     qc["doubao_output"] = qc.get("polished_path")
 
+    # ── 新顺序：先提清晰度（只碰圆盘）→ 再拼两张海报
+    #   2026-11-09：用户指出「让豆包在拼图里顺手处理月面」有隐患，
+    #   改成让豆包只处理圆盘，月面永远不经过 AI。
+    if (not getattr(a, "boost_last", False)
+            and getattr(a, "boost", False) and getattr(a, "moon", False)):
+        try:
+            import stage_boost as _SB
+            _src = qc.get("polished_path") or out_png
+            _extra = ["--date", str(D)]
+            # utc 可能是 None（--no-china 且没给 --utc）；直接 str(None) 会让
+            # compose 的 argparse 崩在 "invalid float value: 'None'"。
+            _utc_v = qc.get("utc", a.utc)
+            if _utc_v is not None:
+                _extra += ["--utc", str(_utc_v)]
+            _extra += ["--earth-pct", "0.36", "--sky-target", "1,1,1"]
+            if getattr(a, "uniform", False):
+                _extra += ["--earth-gamma", "1.0", "--earth-sat", "1.0",
+                           "--moon-gain", "0.65"]
+            _n, _b = _SB.boost_then_compose(
+                _src, os.path.join(HERE, "成品"), str(D),
+                width=a.moon_width, compose_extra=_extra,
+                boost_extra=(["--flat"] if getattr(a, "uniform", False) else []),
+                log=print)
+            if _n:
+                qc["moon_path"] = _n
+                print("[月面] %s" % _n)
+            if _b:
+                qc["moon_boost_path"] = _b
+                print("[月面] %s" % _b)
+            qc["boost_first_done"] = bool(_n)
+            if not _n:
+                # ★ 新路径失败时绝不能退回旧顺序 —— 旧顺序会把整张海报
+                #   交给豆包，月面又会被重绘，正是我们要消除的行为。
+                print("   !! 提升优先失败：只拼图、不提升（不会退回会碰月面的旧顺序）")
+                qc["skip_old_boost"] = True
+        except Exception as e:
+            print("   !! 提升优先异常：%s" % e)
+            print("   !! 只拼图、不提升（不会退回会碰月面的旧顺序）")
+            qc["skip_old_boost"] = True
+
     # ── 《地出》式合成（--moon）
-    if getattr(a, "moon", False):
+    if getattr(a, "moon", False) and not qc.get("boost_first_done"):
         try:
             import subprocess as _sp4
             _src = qc.get("polished_path") or out_png
@@ -607,7 +656,10 @@ def main():
             print("   [月面] 失败：", e)
 
     # ── 最后一道：豆包提清晰度（--boost）
-    if getattr(a, "boost", False) and qc.get("moon_path"):
+    #   boost-first 模式下已经在拼图前对圆盘做完，这里跳过（否则又会碰月面）
+    if (getattr(a, "boost", False) and qc.get("moon_path")
+            and not qc.get("boost_first_done")
+            and not qc.get("skip_old_boost")):
         try:
             import subprocess as _sp5
             _src = qc["moon_path"]
@@ -643,10 +695,14 @@ def main():
             import lighting as _lt
             _utc = qc.get("utc", a.utc)
             _lit = []
-            if qc.get("boost_path") and os.path.exists(qc["boost_path"]):
-                _lit.append(qc["boost_path"])
-            if qc.get("moon_path") and os.path.exists(qc["moon_path"]):
-                _lit.append(qc["moon_path"])
+            # ★ 三个都要打光：旧顺序的 boost_path（海报）、月面、以及
+            #   boost-first 产出的月面提升版。漏掉 moon_boost_path 会让
+            #   提升版变成"满盘平光"（实测暗像素占比 6.2% vs 正常 87.2%）。
+            for _k in ("boost_path", "moon_path", "moon_boost_path"):
+                if qc.get(_k) and os.path.exists(qc[_k]):
+                    _lit.append(qc[_k])
+            # 去重：万一两个键指向同一文件，不能打两次光（打两次会二次压暗）
+            _lit = list(dict.fromkeys(_lit))
             for _p in _lit:
                 _im = Image.open(_p).convert("RGB")
                 # 调试副本：留一份"未打光"的，方便快速调参（不跑豆包）
@@ -656,6 +712,23 @@ def main():
                 print("[打光] %s" % os.path.basename(_p))
         except Exception as _e:
             print("[打光] 失败：", _e)
+
+    # ── 兜底：只要"该有提升版却没有"，就补一个同名文件（内容=月面版）
+    #   两种情况都会缺：
+    #     ① 整个新顺序失败（skip_old_boost=True，走旧拼图）
+    #     ② 拼图成功但"提升版那张"没拼出来（stage_boost 返回 b=None）
+    #   不补的话 verify.py 会因为文件缺失直接 FAIL，而缺的只是一步本来
+    #   就没多少增益的处理；补同名文件既保住交付完整性，也不隐瞒。
+    if getattr(a, "boost", False) and qc.get("moon_path"):
+        try:
+            import shutil as _shc
+            _bn = qc["moon_path"].replace("_月面_", "_月面_提升_")
+            if _bn != qc["moon_path"] and not os.path.exists(_bn):
+                _shc.copy2(qc["moon_path"], _bn)
+                qc["moon_boost_path"] = _bn
+                print("[提升] 失败补偿：提升版 = 月面版（内容相同，原因见上面的日志）")
+        except Exception as _e2:
+            print("[提升] 补偿失败：", _e2)
 
     # ── 自动归档（--archive）
     if getattr(a, "archive", False):

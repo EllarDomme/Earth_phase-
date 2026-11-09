@@ -24,8 +24,27 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # 底图光照方向（2026-11-06 实测更正）：
 #   月面底图的【受光方向】≈ 0°（从右照来）
 #   判据：陨石坑的亮壁在受光的【对面】——亮壁在左 ⇒ 光从右
+# ★ 四张底图（按太阳高度分档，2026-11-09 定稿）
+#   亮度不按"底图 × 系数"算 —— 那样换底图时会跳变。
+#   改成先定"目标亮度曲线"，再反算系数，边界才连续。
+BASE_TIERS = {
+    "无影": (60.0, "moon_base_无影.png"),
+    "短影": (30.0, "moon_base_短影.png"),
+    "中影": (15.0, "moon_base_中影.png"),
+    "长影": (8.0,  "moon_base_长影.png"),
+}
+BASE_LUM = {"无影": 86.0, "短影": 52.0, "中影": 47.0, "长影": 43.0}  # 地形中位亮度
+L_NIGHT = 18.5        # 月夜目标亮度（h=0 处的连续点）
+L_FLOOR = 18.5        # 白天最低 = 夜面上限，保证跨 0° 不回跳
+# ★ 月夜档的"质感补偿"（2026-11-09）
+#   月夜把月面压到中位 ~18，8 位色阶只剩 30 来个（白天是 200+），
+#   高频能量 1.5 vs 7.0，看着糊。这里围绕中位做一次温和的对比度拉伸，
+#   平均亮度基本不变，但细节能读出来。1.0 = 关。
+#   注意：这是"暗部提亮"，属于后期美化，不是物理还原。
+NIGHT_CONTRAST = float(os.environ.get("DSH_NIGHT_CONTRAST", "1.6"))
 BASE = os.path.join(HERE, "素材", "moon_base.png")
 BASE_MIRROR = os.path.join(HERE, "素材", "moon_base_mirror.png")
+_BASE_SCALE = 1.0          # 月面亮度系数（只压不提）
 MOON_LIGHT_DEG = 0.0        # 月面受光方向（画面角度：0=右, 90=上）
 
 ap = argparse.ArgumentParser()
@@ -67,7 +86,38 @@ a = ap.parse_args()
 # ★ 自动选底图：比较"地球亮面朝向"与"月面受光方向"
 _auto_note = ""
 if a.base:
+    # ★ 显式指定底图时，仍然要按光照方向决定用原图还是镜像
+    #   （以前这里直接 return，导致 --base 指定的图永远不镜像，
+    #     2026-11-09 用户发现 47% 那张地球在西、月面却东边受光）
     BASE = a.base
+    if (not a.no_auto_base) and a.date and (a.utc is not None):
+        try:
+            import math as _m0
+            import ephem_hp as _E0
+
+            def _unit0(lat, lon):
+                la, lo = _m0.radians(lat), _m0.radians(lon)
+                return np.array([_m0.cos(la) * _m0.cos(lo),
+                                 _m0.cos(la) * _m0.sin(lo), _m0.sin(la)])
+
+            _l0, _n0 = _E0.sublunar_point(a.date, a.utc)
+            _S0 = _unit0(*_E0.subsolar_point(a.date, a.utc))
+            _V0 = _unit0(_l0, _n0)
+            _ex0 = np.cross([0, 0, 1.0], _V0); _ex0 /= np.linalg.norm(_ex0)
+            _ey0 = np.cross(_V0, _ex0)
+            _sun0 = _m0.degrees(_m0.atan2(float(_S0 @ _ey0), float(_S0 @ _ex0))) % 360
+            _d0 = abs(_sun0 - MOON_LIGHT_DEG) % 360
+            _d0 = min(_d0, 360 - _d0)
+            _mir0 = a.base.replace(".png", "_mirror.png")
+            if _d0 > 90 and os.path.exists(_mir0):
+                BASE = _mir0
+                _auto_note = ("地球亮面 %.0f° / 月面受光 %.0f° → 相差 %.0f°，"
+                              "显式底图换成【镜像】" % (_sun0, MOON_LIGHT_DEG, _d0))
+            else:
+                _auto_note = ("地球亮面 %.0f° / 月面受光 %.0f° → 相差 %.0f°，"
+                              "显式底图用【原图】" % (_sun0, MOON_LIGHT_DEG, _d0))
+        except Exception as _e0:
+            _auto_note = "显式底图的镜像判断失败（%s），用原图" % _e0
 elif (not a.no_auto_base) and a.date and (a.utc is not None):
     try:
         import math as _m
@@ -80,16 +130,54 @@ elif (not a.no_auto_base) and a.date and (a.utc is not None):
         _lat0, _lon0 = _E.sublunar_point(a.date, a.utc)
         _S = _unit(*_E.subsolar_point(a.date, a.utc))
         _V = _unit(_lat0, _lon0)
+
+        # ★ 月面太阳高度（子月下点）
+        #   ephem_hp 返回的 S / V 方向相反（S 是"指向太阳"，V 是"指向地球"），
+        #   实测直接 asin(S·V) 会得到反号，所以取负号。
+        _h = -_m.degrees(_m.asin(max(-1.0, min(1.0, float(_S @ _V)))))
+
+        # ① 目标亮度（唯一真相，连续函数）
+        if _h <= 0:
+            _L = L_NIGHT - 3.0 * min(1.0, -_h / 60.0)     # 月夜：18.5 → 15.5
+        else:
+            _L = 86.0 * (_m.sin(_m.radians(max(_h, 0.5))) / _m.sin(_m.radians(60.0))) ** 0.7
+            _L = max(_L, L_FLOOR)                          # ★ 不能比夜面还黑
+
+        # ② 选底图：只管"影子形态"，亮度由目标曲线统一决定
+        _IS_NIGHT = _h < 0
+        if _h < 0:
+            _tier = "无影"          # 无直射光，没有影子
+        elif _h >= 45:
+            _tier = "无影"
+        elif _h >= 22:
+            _tier = "短影"
+        elif _h >= 5:
+            _tier = "中影"
+        else:
+            _tier = "长影"
+
+        # ③ 反算系数
+        #   · 无影底图够亮，只压不提
+        #   · 短/中/长影底图偏暗，允许最多 +30% 提亮，否则分档边界会出现
+        #     20 多个亮度单位的跳变（实测 44.5°→45° 差 22.6）
+        _cap = 1.0 if _tier == "无影" else 1.30
+        _BASE_SCALE = max(0.05, min(_cap, _L / BASE_LUM[_tier]))
+        _tier_file = BASE_TIERS[_tier][1]
+        _p_tier = os.path.join(HERE, "素材", _tier_file)
+        _p_tier_m = os.path.join(HERE, "素材", _tier_file.replace(".png", "_mirror.png"))
+        print("月面：太阳高度 %+.1f° → 目标亮度 %.1f → 用【%s】×%.2f"
+              % (_h, _L, _tier, _BASE_SCALE))
         _ex = np.cross([0, 0, 1.0], _V); _ex /= np.linalg.norm(_ex)
         _ey = np.cross(_V, _ex)
         _sun_deg = _m.degrees(_m.atan2(float(_S @ _ey), float(_S @ _ex))) % 360
         _d = abs(_sun_deg - MOON_LIGHT_DEG) % 360
         _d = min(_d, 360 - _d)
-        if _d > 90 and os.path.exists(BASE_MIRROR):
-            BASE = BASE_MIRROR
+        if _d > 90 and os.path.exists(_p_tier_m):
+            BASE = _p_tier_m
             _auto_note = "地球亮面 %.0f° / 月面受光 %.0f° → 相差 %.0f°，用【镜像底图】" % (
                 _sun_deg, MOON_LIGHT_DEG, _d)
         else:
+            BASE = _p_tier if os.path.exists(_p_tier) else BASE
             _auto_note = "地球亮面 %.0f° / 月面受光 %.0f° → 相差 %.0f°，用【原底图】" % (
                 _sun_deg, MOON_LIGHT_DEG, _d)
     except Exception as _e:
@@ -101,12 +189,27 @@ if _auto_note:
 if not os.path.exists(BASE):
     sys.exit("缺少底图：%s（先跑 make_base_final.py）" % BASE)
 
+if "_IS_NIGHT" not in dir():
+    _IS_NIGHT = False
+
 base = Image.open(BASE).convert("RGB")
-if getattr(a, "moon_gain", 1.0) != 1.0:
+_gain_all = float(getattr(a, "moon_gain", 1.0)) * _BASE_SCALE
+if abs(_gain_all - 1.0) > 0.001:
     import numpy as _np2
-    _b = _np2.asarray(base).astype(_np2.float32) * float(a.moon_gain)
+    _b = _np2.asarray(base).astype(_np2.float32) * _gain_all
     base = Image.fromarray(_np2.clip(_b, 0, 255).astype(_np2.uint8))
-    print("月面亮度：x%.2f" % a.moon_gain)
+    print("月面亮度：x%.2f（含相位系数 %.2f）" % (_gain_all, _BASE_SCALE))
+
+# ★ 月夜档：围绕地形中位做温和对比拉伸，找回被压掉的质感
+if _IS_NIGHT and NIGHT_CONTRAST > 1.01:
+    _bn = np.asarray(base).astype(np.float32)
+    _lum = _bn.mean(2)
+    _tm = _lum > 1                      # 地形（天空是 0）
+    if _tm.any():
+        _med = float(np.median(_lum[_tm]))
+        _bn[_tm] = np.clip(_med + (_bn[_tm] - _med) * NIGHT_CONTRAST, 0, 255)
+        base = Image.fromarray(np.clip(_bn, 0, 255).astype(np.uint8))
+        print("月面质感：月夜档对比 x%.2f（中位 %.0f 保持）" % (NIGHT_CONTRAST, _med))
 W0, H0 = base.size
 W = a.width
 H = int(round(H0 * W / W0))
@@ -160,7 +263,8 @@ if not a.keep_stars:
     A = np.asarray(base).astype(np.float32)
     Hh, Ww = A.shape[:2]
     yy, xx = np.mgrid[0:Hh, 0:Ww]
-    _disc = np.hypot(xx - 0.50 * Ww, yy - 0.31 * Hh) <= (a.earth_pct / 2) * Ww * 0.62
+    # 圆心必须跟 --cx/--cy 走；半径跟 --earth-pct 走（原来圆心写死，传 --cx 会错位）
+    _disc = np.hypot(xx - a.cx * Ww, yy - a.cy * Hh) <= (a.earth_pct / 2) * Ww * 0.62
 
     # ★ 天空 mask 要跟随地形轮廓：按行 hz 切会把山峰高光当星点摘掉
     #   （实测 y=756 处亮度 12.1 → 9.2，顶部像被削平）

@@ -9,10 +9,13 @@ set "HERE=%~dp0"
 if "%HERE:~-1%"=="\" set "HERE=%HERE:~0,-1%"
 
 set "PY="
-if exist "C:\Users\34684\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe" set "PY=C:\Users\34684\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
-if not "%PY%"=="" goto :havepy
+if exist "%HERE%\python.txt" for /f "usebackq delims=" %%i in ("%HERE%\python.txt") do if not defined PY set "PY=%%i"
+if defined PY goto :havepy
 for /f "delims=" %%i in ('where python 2^>nul') do if not defined PY set "PY=%%i"
-
+if defined PY goto :havepy
+for /d %%v in ("%LOCALAPPDATA%\Programs\Python\Python3*") do if not defined PY if exist "%%~v\python.exe" set "PY=%%~v\python.exe"
+if defined PY goto :havepy
+for /d %%v in ("%ProgramFiles%\Python3*") do if not defined PY if exist "%%~v\python.exe" set "PY=%%~v\python.exe"
 :havepy
 if "%PY%"=="" goto :nopy
 "%PY%" "%HERE%\verify.py" %PDATE%

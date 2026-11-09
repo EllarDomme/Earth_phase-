@@ -2,8 +2,9 @@
 setlocal
 
 rem run.cmd - one-command poster builder (ASCII only; see AGENTS.md)
-rem usage: run.cmd 2003-09-23 [legacy|noboost|keep-tmp|uniform]
-rem default mode = uniform (lighting applied last, Doubao sees a full disc)
+rem usage: run.cmd 2003-09-23 [legacy|noboost|keep-tmp|boostlast]
+rem default = uniform + boost-first
+rem   Doubao only sharpens the Earth disc; the moon is never touched
 
 if "%~1"=="" goto :usage
 set "PDATE=%~1"
@@ -34,10 +35,12 @@ echo python: %PY%
 if "%MODE%"=="legacy" goto :run_legacy
 if "%MODE%"=="noboost" goto :run_noboost
 if "%MODE%"=="keep-tmp" goto :run_keeptmp
+if "%MODE%"=="boostfirst" goto :run_uniform
+if "%MODE%"=="boostlast" goto :run_uniform_last
 goto :run_uniform
 
 :run_legacy
-"%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost
+"%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --boost-last
 goto :after
 
 :run_noboost
@@ -47,6 +50,11 @@ goto :after
 :run_keeptmp
 "%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --uniform --no-clean
 goto :after
+
+:run_uniform_last
+"%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --boost-last --uniform
+exit /b %errorlevel%
+
 
 :run_uniform
 "%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --uniform
@@ -66,6 +74,7 @@ exit /b 0
 
 :usage
 echo usage: run.cmd ^<YYYY-MM-DD^> [legacy^|noboost^|keep-tmp^|uniform]
+echo   boostlast = OLD order (Doubao re-polishes the moon; not recommended)
 echo   default = uniform (recommended)
 exit /b 1
 

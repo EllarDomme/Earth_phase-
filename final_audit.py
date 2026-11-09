@@ -11,8 +11,8 @@ CHECKS = [
     ("make_earth_full.py", "中国规则接入", r"china_rule"),
     ("compose_moon.py", "底图为原版 moon_base.png", r'"moon_base\.png"'),
     ("compose_moon.py", "地球默认不旋转", r'earth-rot", type=float, default=0\.0'),
-    ("compose_moon.py", "天空对齐 3,3,4", r'default="3,3,4"'),
-    ("compose_moon.py", "抹星（MinFilter）", r"MinFilter\(5\)"),
+    ("compose_moon.py", "天空目标 1,1,1", r'default="1,1,1"'),
+    ("compose_moon.py", "抹星（starless）", r"strip_stars"),
     ("compose_moon.py", "高光只软膝", r"高光软膝"),
     ("compose_moon.py", "无全局缩放", r"不做全局缩放"),
     ("compose_moon.py", "gamma 0.88", r'earth-gamma", type=float, default=0\.88'),
@@ -24,8 +24,8 @@ CHECKS = [
     ("render_earth.py", "高光余量 knee 0.48", r"knee = 0\.48"),
     ("render_earth.py", "环境光 0.02", r'AMBIENT", 0\.02'),
     ("doubao_polish.py", "交付原生尺寸", r"原生，不做上采样"),
-    ("doubao_polish.py", "删对话同步", r"必须同步执行"),
-    ("doubao_polish.py", "删对话兜底", r"兜底取到"),
+    ("doubao_polish.py", "删对话调用", r"delete_conv\.mjs"),
+    ("doubao_polish.py", "删对话日志", r"\[删对话\]"),
 ]
 
 print("%-22s %-26s %s" % ("文件", "检查项", "结果"))

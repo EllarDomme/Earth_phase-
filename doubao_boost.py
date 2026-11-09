@@ -21,6 +21,31 @@ import numpy as np
 from PIL import Image
 from layout import EARTH_CX, EARTH_CY, EARTH_PCT, disc_geom
 
+# ★ 几何覆盖（2026-11-09）
+#   本模块原来一律按"海报版式"（cx=0.50, cy=0.31, R=0.36W）定位地球。
+#   但「把提清晰度挪到拼图之前」时，处理对象是**居中铺满的圆盘图**
+#   （cx=0.50, cy=0.50, R=0.50W）——直接沿用海报几何会全部打偏：
+#     restore_scene 判错盘外 / match_disc 圈错区域 / clean_rim 擦错边缘。
+#   用法：set_disc_geom(0.5, 0.5, 0.5)，传 None 恢复默认海报版式。
+_GEOM = None
+
+
+def set_disc_geom(fx=None, fy=None, fr=None):
+    """按归一化比例覆盖圆盘几何；三个都传 None 则恢复默认（海报版式）。"""
+    global _GEOM
+    if fx is None and fy is None and fr is None:
+        _GEOM = None
+    else:
+        _GEOM = (float(fx), float(fy), float(fr))
+
+
+def _geom(W, H):
+    if _GEOM is None:
+        return disc_geom(W, H)
+    fx, fy, fr = _GEOM
+    return fx * W, fy * H, fr * W
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 import config as _cfg
 NODE = _cfg.NODE
@@ -189,7 +214,7 @@ def blend_by_phase(boosted, original, lo=40.0, hi=150.0, soft=0):
     A = np.asarray(boosted.convert("RGB")).astype(np.float32)
     B = np.asarray(original.convert("RGB").resize(boosted.size, Image.LANCZOS)).astype(np.float32)
     H, W = A.shape[:2]
-    cx, cy, _R = disc_geom(W, H)
+    cx, cy, _R = _geom(W, H)
     cx, cy, D = int(cx), int(cy), int(2 * _R)
     yy, xx = np.mgrid[0:H, 0:W]
     disc = (np.hypot(xx - cx, yy - cy) <= D / 2 * 1.01)
@@ -227,7 +252,7 @@ def restore_scene(boosted, original):
     A = np.asarray(boosted.convert("RGB")).astype(np.float32)
     B = np.asarray(original.convert("RGB").resize(boosted.size, Image.LANCZOS)).astype(np.float32)
     H, W = A.shape[:2]
-    cx, cy, _R = disc_geom(W, H)
+    cx, cy, _R = _geom(W, H)
     cx, cy, D = int(cx), int(cy), int(2 * _R)
     yy, xx = np.mgrid[0:H, 0:W]
     outside = np.hypot(xx - cx, yy - cy) > D / 2 * 1.02   # 圆盘外（留 2% 余量）
@@ -255,7 +280,7 @@ def match_disc(boosted, original, label="地球"):
     A = np.asarray(boosted.convert("RGB")).astype(np.float32)
     B = np.asarray(original.convert("RGB").resize(boosted.size, Image.LANCZOS)).astype(np.float32)
     H, W = A.shape[:2]
-    cx, cy, _R = disc_geom(W, H)
+    cx, cy, _R = _geom(W, H)
     D = int(2 * _R)
     yy, xx = np.mgrid[0:H, 0:W]
     inside = np.hypot(xx - cx, yy - cy) <= D / 2 * 0.98
@@ -320,7 +345,7 @@ def deglint(img, date, utc, strength=0.55):
 
     A = np.asarray(img.convert("RGB")).astype(np.float32)
     H, W = A.shape[:2]
-    _cx, _cy, R = disc_geom(W, H)
+    _cx, _cy, R = _geom(W, H)
     cx, cy = int(_cx), int(_cy)
     yy, xx = np.mgrid[0:H, 0:W]
     u = (xx - cx) / R
@@ -364,7 +389,7 @@ def clean_rim(img, feather=2.0, ss=4):
 
     A = img.convert("RGB")
     W, H = A.size
-    cx, cy, R = disc_geom(W, H)
+    cx, cy, R = _geom(W, H)
 
     big = int(max(W, H) * ss / 4) if ss > 1 else max(W, H)    # 控制内存
     k = ss / 4.0 if ss > 1 else 1.0
@@ -422,7 +447,7 @@ def finish_tone(img, date, utc, desat=0.0, limb_gain=0.22):
 
     A = np.asarray(img.convert("RGB")).astype(np.float32)
     H, W = A.shape[:2]
-    cx, cy, R = int(0.50 * W), int(0.31 * H), int(0.36 * W / 2)
+    cx, cy, R = _geom(W, H)   # ★ 唯一真相（原来写死 0.50/0.31/0.36）
     yy, xx = np.mgrid[0:H, 0:W]
     u = (xx - cx) / R
     v = -(yy - cy) / R
@@ -472,7 +497,7 @@ def physics_report(img, date, utc):
 
     A = np.asarray(img.convert("L")).astype(np.float32)
     H, W = A.shape
-    cx, cy, R = disc_geom(W, H)
+    cx, cy, R = _geom(W, H)
     yy, xx = np.mgrid[0:H, 0:W]
     u = (xx - cx) / R
     v = -(yy - cy) / R
@@ -551,7 +576,7 @@ def night_crush(img, date, utc, target=0.020):
 
     A = np.asarray(img.convert("RGB")).astype(np.float32)
     H, W = A.shape[:2]
-    _cx, _cy, R = disc_geom(W, H)
+    _cx, _cy, R = _geom(W, H)
     cx, cy = int(_cx), int(_cy)
     yy, xx = np.mgrid[0:H, 0:W]
     u = (xx - cx) / R
@@ -628,9 +653,17 @@ def main():
     ap.add_argument("--flat", action="store_true",
                     help="输入是匀光圆盘：只去水印，不做相位融合/夜面/光照补偿"
                     "（光照由 lighting.py 在最后统一施加）")
+    ap.add_argument("--disc-geom", default=None,
+                    help="圆盘几何 fx,fy,fr（归一化）。默认海报版式；居中铺满圆盘传 0.5,0.5,0.5")
     ap.add_argument("--deglint", type=float, default=0.55,
                     help="光照补偿强度（抵消渲染端的耀斑压制，0=关）")
     a = ap.parse_args()
+
+    if a.disc_geom:
+        _p = [float(v) for v in a.disc_geom.split(",")]
+        if len(_p) == 3:
+            set_disc_geom(*_p)
+            print("[提升] 圆盘几何覆盖为 %.3f,%.3f,%.3f（居中圆盘用 0.5,0.5,0.5）" % tuple(_p))
 
     src = a.image
     out = a.out or os.path.splitext(src)[0] + "_boost.png"

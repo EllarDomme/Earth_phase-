@@ -311,6 +311,11 @@ def apply_lighting(img, date, utc, ambient=0.0002, limb_k=0.72, limb_p=0.45,
     if verbose:
         m = rr < 0.95
         o = _linear_to_srgb(out / 255.0)
-        print("   打光：昼面均亮 %.0f   夜面均亮 %.0f"
-              % (o[m & (cosi > 0.3)].mean(), o[m & (cosi < -0.3)].mean()))
+        _day = o[m & (cosi > 0.3)]
+        _night = o[m & (cosi < -0.3)]
+        # ★ 满相位（cosi 全为正）或新月（全为负）时，另一侧没有像素，
+        #   直接 .mean() 会打印 nan —— 实测 2008-10-29（100%）刷出"夜面均亮 nan"。
+        print("   打光：昼面均亮 %s   夜面均亮 %s"
+              % ("%.0f" % _day.mean() if _day.size else "—",
+                 "%.0f" % _night.mean() if _night.size else "—"))
     return Image.fromarray(_linear_to_srgb(out / 255.0).astype(np.uint8))

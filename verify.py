@@ -118,7 +118,8 @@ def main(date):
     C = np.asarray(Image.open(files["提升版"]).convert("RGB")).astype(np.float32)
     H, W = C.shape[:2]
     yy, xx = np.mgrid[0:H, 0:W]
-    disc = np.hypot(xx - 0.5 * W, yy - 0.31 * H) <= EARTH_PCT * W / 2 * 0.95
+    _cx, _cy, _R = disc_geom(W, H)   # ★ 唯一真相（原来写死 0.5/0.31）
+    disc = np.hypot(xx - _cx, yy - _cy) <= _R * 0.95
     over = float((C[disc].max(1) > 245).mean() * 100)
     print("  曝光：过曝(>245) %.2f%% %s" % (over, "✓" if over < 2 else "✗"))
     if over >= 2:
