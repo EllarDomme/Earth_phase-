@@ -66,6 +66,11 @@ ap.add_argument("--moon-grain", type=float, default=0.0,
                      "白噪声太规整、肉眼可见，已弃用；真要加必须有空间相关的胶片颗粒模型")
 ap.add_argument("--cx", type=float, default=0.50)
 ap.add_argument("--cy", type=float, default=0.31)
+ap.add_argument("--earth-size", default="artistic",
+                choices=["artistic", "true"],
+                help="artistic=占画宽36%%（艺术压缩）；true=真实角直径1.9°（40°视场下4.75%%）")
+ap.add_argument("--earth-fov", type=float, default=None,
+                help="真实尺寸用的画框视场角（默认 40°）")
 ap.add_argument("--sky-target", default="1,1,1",
                     help="天空统一色；默认 1,1,1 = 真实太空（近似全黑）")
 ap.add_argument("--keep-stars", action="store_true")
@@ -338,13 +343,23 @@ if abs(a.earth_rot) > 0.1:
     earth = earth.rotate(a.earth_rot, resample=Image.BICUBIC, expand=False)
     print("地球旋转：%.0f°（逆时针）" % a.earth_rot)
 
+# 地球尺寸两模式：真实的按角直径换算，并把 cy 摆到地平线上方
+# ★ 必须在算 D / 缩放之前决定 pct，否则 D 还是旧值（2026-11-10 踩过）
+if a.earth_size == "true":
+    import layout as _L
+    a.earth_pct = _L.earth_pct("true", a.earth_fov)
+
 D = int(W * a.earth_pct)
 earth = earth.resize((D, D), Image.LANCZOS)
 mask = Image.new("L", (D, D), 0)
 ImageDraw.Draw(mask).ellipse((0, 0, D - 1, D - 1), fill=255)
 mask = mask.filter(ImageFilter.GaussianBlur(1.0))
 
-cx, cy = int(W * a.cx), int(H * a.cy)
+if a.earth_size == "true":
+    _cx_px, _cy_px, _R = _L.disc_geom(W, H, pct=a.earth_pct, cx=a.cx)
+    cx, cy = int(_cx_px), int(_cy_px)
+else:
+    cx, cy = int(W * a.cx), int(H * a.cy)
 # ★ 贴之前先把源图的"外圈天空"削掉：
 #   地相图是正方形，圆盘外面还有它自己的背景（灰 8~12）。
 #   如果圆盘没有精确内切，掩膜边缘会带进一圈源图天空

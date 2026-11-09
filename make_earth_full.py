@@ -223,6 +223,9 @@ def main():
     ap.add_argument("--moon", action="store_true", default=False,
                     help="再合成《地出》式版式：月面底图 + 我们的地球")
     ap.add_argument("--moon-width", type=int, default=1920)
+    ap.add_argument("--earth-size", default="artistic",
+                    choices=["artistic", "true"],
+                    help="artistic=占画宽36%%；true=真实角直径1.9°（40°视场下4.75%%）")
     ap.add_argument("--boost", action="store_true", default=False,
                     help="把月面图交豆包提清晰度（旧顺序：拼图后处理整张海报）")
     ap.add_argument("--boost-last", action="store_true", default=False,
@@ -603,6 +606,9 @@ def main():
             if _utc_v is not None:
                 _extra += ["--utc", str(_utc_v)]
             _extra += ["--earth-pct", "0.36", "--sky-target", "1,1,1"]
+            if getattr(a, "earth_size", "artistic") != "artistic":
+                _extra += ["--earth-size", a.earth_size]
+                print("[地球] 尺寸模式：%s" % a.earth_size)
             if getattr(a, "uniform", False):
                 _extra += ["--earth-gamma", "1.0", "--earth-sat", "1.0",
                            "--moon-gain", "0.65"]
@@ -650,6 +656,9 @@ def main():
                 _cmd4 += ["--date", str(D), "--utc", str(qc.get("utc", a.utc))]
             except Exception:
                 pass
+            if getattr(a, "earth_size", "artistic") != "artistic":
+                _cmd4 += ["--earth-size", a.earth_size]
+                print("[地球] 尺寸模式：%s" % a.earth_size)
             _r = _sp4.run(_cmd4, capture_output=True, text=True, timeout=600)
             for _ln in (_r.stdout or "").splitlines():
                 if _ln.startswith(("底图选择", "天空底色", "星点", "输出", "  地球")):
@@ -710,13 +719,24 @@ def main():
                     _lit.append(qc[_k])
             # 去重：万一两个键指向同一文件，不能打两次光（打两次会二次压暗）
             _lit = list(dict.fromkeys(_lit))
+            # ★ 几何要跟地球尺寸一致：真实尺寸下圆盘只有 91px，
+            #   沿用默认几何会把大气弧画在旧半径上（放大出现大虚圈）。
+            try:
+                import layout as _L
+                _pct = _L.earth_pct(getattr(a, "earth_size", "artistic"))
+                _g = _L.disc_geom(1920, 1280, pct=_pct)
+                if abs(_pct - _L.EARTH_PCT) < 1e-9:
+                    _g = None          # 默认尺寸：走 lighting 内部原逻辑
+            except Exception:
+                _g = None
             for _p in _lit:
                 _im = Image.open(_p).convert("RGB")
                 # 调试副本：留一份"未打光"的，方便快速调参（不跑豆包）
                 _dbg = os.path.join(OUT, "_bak_uni_" + os.path.basename(_p))
                 _im.save(_dbg)
-                _lt.apply_lighting(_im, D, _utc).save(_p)
-                print("[打光] %s" % os.path.basename(_p))
+                _lt.apply_lighting(_im, D, _utc, geom=_g).save(_p)
+                print("[打光] %s%s" % (os.path.basename(_p),
+                                     "" if _g is None else "（真实尺寸几何）"))
         except Exception as _e:
             print("[打光] 失败：", _e)
 

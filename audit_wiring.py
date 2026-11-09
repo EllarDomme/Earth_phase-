@@ -33,6 +33,7 @@ F = {
     "req": os.path.join(HERE, "requirements.txt"),
     "agents_repo": os.path.join(HERE, "AGENTS.md"),
     "stage": os.path.join(HERE, "stage_boost.py"),
+    "layout": os.path.join(HERE, "layout.py"),
 }
 
 # (文件, 说明, 正则)
@@ -231,6 +232,9 @@ CHECKS = [
     ("moon!", "旧的重复星历代码已删", r"def _unit0\("),
     ("boost", "几何格式校验", r"需要三个归一化数"),
     ("verify", "宽度不写死 1920", r"_pick\(date, "),
+    ("layout", "真实尺寸常量", r"EARTH_PCT_TRUE"),
+    ("moon", "earth-size 参数", r"--earth-size"),
+    ("full", "earth-size 传下去", r"a\.earth_size"),
     ("full", "noboost 也补齐提升版", r"noboost）：提升版 = 月面版"),
     ("moon", "星点 mask 跟随 --cx", r"a\.cx \* Ww"),
     ("moon!", "星点 mask 不再写死圆心", r"xx - 0\.50 \* Ww"),

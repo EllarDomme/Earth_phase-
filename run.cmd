@@ -2,7 +2,7 @@
 setlocal
 
 rem run.cmd - one-command poster builder (ASCII only; see AGENTS.md)
-rem usage: run.cmd 2003-09-23 [legacy|noboost|keep-tmp|boostlast]
+rem usage: run.cmd 2003-09-23 [legacy|noboost|keep-tmp|boostlast|true]
 rem default = uniform + boost-first
 rem   Doubao only sharpens the Earth disc; the moon is never touched
 
@@ -37,6 +37,7 @@ if "%MODE%"=="noboost" goto :run_noboost
 if "%MODE%"=="keep-tmp" goto :run_keeptmp
 if "%MODE%"=="boostfirst" goto :run_uniform
 if "%MODE%"=="boostlast" goto :run_uniform_last
+if "%MODE%"=="true" goto :run_true
 goto :run_uniform
 
 :run_legacy
@@ -55,6 +56,10 @@ goto :after
 "%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --boost-last --uniform
 exit /b %errorlevel%
 
+
+:run_true
+"%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --uniform --earth-size true
+goto :after
 
 :run_uniform
 "%PY%" "%HERE%\make_earth_full.py" %PDATE% --size 2048 --polish --archive --moon --boost --uniform
@@ -75,6 +80,7 @@ exit /b 0
 :usage
 echo usage: run.cmd ^<YYYY-MM-DD^> [legacy^|noboost^|keep-tmp^|uniform]
 echo   boostlast = OLD order (Doubao re-polishes the moon; not recommended)
+echo   true  = TRUE angular size of Earth (1.9 deg, 4.75 pct of width)
 echo   default = uniform (recommended)
 exit /b 1
 
