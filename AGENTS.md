@@ -104,6 +104,7 @@ python config.py      # 会打印当前生效的路径与启动命令
 | `--earth-pct` | `compose_moon.py` | **0.36** | 地球直径占画宽 |
 | `--cx / --cy` | `compose_moon.py` | 0.50 / 0.31 | 地球位置 |
 | `--moon-gain` | `compose_moon.py` | **0.65** | 月面亮度 |
+| `NIGHT_CONTRAST` | `compose_moon.py` | **4.0** | 月夜档地形对比（中位不动） |
 | `--sky-target` | `compose_moon.py` | **1,1,1** | 天空刷近黑 |
 | `EXPOSURE` | `lighting.py` | **1.7** | 曝光（相机选择，非物理） |
 | `term_w` | `lighting.py` | 0.08 | 晨昏线过渡带 |
@@ -176,6 +177,7 @@ python audit_behavior.py --strict   # 行为验证（真跑 compose）
 | `run.cmd <日期> keep-tmp` | 保留中间产物 |
 | `run.cmd <日期> legacy` | 旧流程（先打光） |
 | `verify.cmd <日期>` | 交付前自证，必须 PASS |
+| `python 诊断\audit_deliverables.py` | 成品体检：反推实际用的底图 |
 
 ---
 
